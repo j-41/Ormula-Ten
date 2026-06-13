@@ -28,7 +28,6 @@ Welcome to **Ormula-Ten**, a thrilling retro-inspired 2D racing game built with 
 
 ## 🏁 Getting Started
 
-```markdown
 ### 1. Clone the repository
 git clone https://github.com/j-41/Ormula-Ten.git
 cd Ormula-Ten
