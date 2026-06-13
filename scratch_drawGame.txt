@@ -1,0 +1,278 @@
+function drawScene(vpY, vpHeight, focusPlayer, isP2) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, vpY, CONFIG.width, vpHeight);
+  ctx.clip();
+  ctx.translate(0, vpY);
+
+  // Translate vertical view so focusPlayer is always at y=650
+  const yShift = 650 - focusPlayer.y;
+  ctx.translate(0, yShift);
+
+  // Screen Shake
+  if (state.screenShake > 0) {
+    ctx.translate((Math.random() - 0.5) * state.screenShake, (Math.random() - 0.5) * state.screenShake);
+  }
+
+  // --- 1. RENDER BACKGROUND TRACK (THEME STYLED) ---
+  let grassColor = '#06070d';
+  let roadColor = '#181920';
+  let linesColor = 'rgba(255, 255, 255, 0.4)';
+  let curbBright = 'var(--neon-green)';
+  let curbDark = '#06070d';
+
+  if (state.currentTheme === 'easter') {
+    grassColor = '#55efc4'; roadColor = '#ffb8b8'; curbBright = '#ffeaa7'; curbDark = '#fd79a8'; linesColor = '#fff';
+  } else if (state.currentTheme === 'new_years') {
+    grassColor = '#000000'; roadColor = '#111111'; curbBright = '#f1c40f'; curbDark = '#e67e22'; linesColor = '#f39c12';
+  } else if (state.currentTheme === 'christmas') {
+    grassColor = '#ecf0f1'; roadColor = '#bdc3c7'; curbBright = '#e74c3c'; curbDark = '#2ecc71'; linesColor = '#fff';
+  } else if (state.currentTheme === 'winter') {
+    grassColor = '#dfe6e9'; roadColor = '#b2bec3'; curbBright = '#74b9ff'; curbDark = '#0984e3'; linesColor = '#fff';
+  } else if (state.currentTheme === 'autumn' || state.currentTheme === 'fall') {
+    grassColor = '#d35400'; roadColor = '#2c3e50'; curbBright = '#f39c12'; curbDark = '#e67e22'; linesColor = '#e74c3c';
+  } else if (state.currentTheme === 'summer') {
+    grassColor = '#ffeaa7'; roadColor = '#81ecec'; curbBright = '#ff7675'; curbDark = '#fab1a0'; linesColor = '#fdcb6e';
+  } else if (state.currentTheme === 'vip') {
+    grassColor = '#1a1a1a'; roadColor = '#0a0a0a'; curbBright = '#ffd700'; curbDark = '#b8860b'; linesColor = '#ffd700';
+  }
+
+  ctx.fillStyle = grassColor;
+  ctx.fillRect(0, -yShift, CONFIG.width, vpHeight + Math.abs(yShift));
+
+  ctx.fillStyle = roadColor;
+  ctx.fillRect(80, -yShift, CONFIG.roadWidth, vpHeight + Math.abs(yShift));
+
+  // The road pattern repeats
+  const yOffset = state.roadY % 40;
+  for (let i = -yShift; i < vpHeight + Math.abs(yShift); i += 40) {
+    ctx.fillStyle = ((i + Math.floor(state.roadY)) % 80 < 40) ? curbBright : curbDark;
+    ctx.fillRect(75, i + yOffset, 10, 40);
+    ctx.fillRect(395, i + yOffset, 10, 40);
+
+    ctx.fillStyle = linesColor;
+    if (((i + Math.floor(state.roadY)) % 80 < 40)) {
+      ctx.fillRect(CONFIG.laneCenters[0] + 50, i + yOffset, 4, 30);
+      ctx.fillRect(CONFIG.laneCenters[1] + 50, i + yOffset, 4, 30);
+    }
+  }
+
+  drawVIPGoldOverlay(ctx);
+
+  if (state.images.track && state.currentTheme === 'default') {
+    const trackImgY = (focusPlayer.distance % CONFIG.height);
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.drawImage(state.images.track, 0, trackImgY - CONFIG.height, CONFIG.width, CONFIG.height);
+    ctx.drawImage(state.images.track, 0, trackImgY, CONFIG.width, CONFIG.height);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // Draw Safety Car
+  if (state.safetyCarActive && state.safetyCar) {
+    const sc = state.safetyCar;
+    ctx.save();
+    ctx.translate(sc.x, sc.y);
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = Math.floor(Date.now() / 200) % 2 === 0 ? '#ff0000' : '#0000ff';
+    if (state.images.safetyCar) ctx.drawImage(state.images.safetyCar, -sc.width / 2, -sc.height / 2, sc.width, sc.height);
+    ctx.restore();
+  }
+
+  // Enemies
+  state.enemies.forEach(e => {
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    if (state.timeOfDay === 'night' || state.timeOfDay === 'sunset') {
+      ctx.fillStyle = 'rgba(255, 255, 150, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(-15, -45);
+      ctx.lineTo(-60, -250);
+      ctx.lineTo(60, -250);
+      ctx.moveTo(15, -45);
+      ctx.fill();
+    }
+    const imgObj = state.images['enemy' + e.image];
+    if (imgObj) {
+      if (e.colorHue > 0) ctx.filter = \hue-rotate(\deg)\;
+      ctx.drawImage(imgObj, -e.width / 2, -e.height / 2, e.width, e.height);
+    } else {
+      ctx.fillStyle = 'red';
+      ctx.fillRect(-e.width / 2, -e.height / 2, e.width, e.height);
+    }
+    ctx.restore();
+  });
+
+  // Powerups
+  state.powerups.forEach(item => {
+    if(!item.active) return;
+    ctx.save();
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = 'var(--neon-yellow)';
+
+    if (item.type === 'coin') {
+      const spinWidth = item.radius * Math.abs(Math.sin(Date.now() * 0.008));
+      ctx.fillStyle = 'var(--neon-yellow)';
+      ctx.beginPath();
+      ctx.ellipse(item.x, item.y, spinWidth, item.radius, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 12px Orbitron';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (spinWidth > 5) ctx.fillText('C', item.x, item.y);
+    } else if (item.type === 'nos') {
+      ctx.fillStyle = 'var(--neon-blue)';
+      ctx.shadowColor = 'var(--neon-blue)';
+      ctx.fillRect(item.x - 10, item.y - 15, 20, 30);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(item.x - 4, item.y - 20, 8, 5);
+      ctx.fillStyle = '#000';
+      ctx.font = '900 9px Orbitron';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('N', item.x, item.y);
+    } else if (item.type === 'shield') {
+      ctx.fillStyle = 'var(--neon-pink)';
+      ctx.shadowColor = 'var(--neon-pink)';
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, item.radius * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = '900 10px Orbitron';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('S', item.x, item.y);
+    } else if (item.type === 'repair') {
+      ctx.fillStyle = 'var(--neon-green)';
+      ctx.shadowColor = 'var(--neon-green)';
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, item.radius * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.font = '900 14px Orbitron';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('+', item.x, item.y);
+    }
+    ctx.restore();
+  });
+
+  // Particles
+  state.particles.forEach(p => {
+    ctx.save();
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // Draw Player
+  drawPlayerObj(state.player, false);
+  if(state.isMultiplayer) drawPlayerObj(state.player2, true);
+
+  // Overlay Masks (Night/Rain)
+  if (state.timeOfDay === 'night' || state.timeOfDay === 'sunset') {
+    const opacity = state.timeOfDay === 'night' ? 0.85 : 0.45;
+    const overlay = document.createElement('canvas');
+    overlay.width = CONFIG.width;
+    overlay.height = CONFIG.height;
+    const octx = overlay.getContext('2d');
+    octx.fillStyle = \gba(5, 6, 12, \)\;
+    octx.fillRect(0, 0, CONFIG.width, CONFIG.height);
+    octx.globalCompositeOperation = 'destination-out';
+
+    // Player 1 lights
+    let p = state.player;
+    let grad = octx.createRadialGradient(p.x, p.y - p.height / 2, 20, p.x, p.y - 300, 200);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+    grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+    octx.fillStyle = grad;
+    octx.beginPath();
+    octx.moveTo(p.x - 12, p.y - p.height / 2); octx.lineTo(p.x - 120, p.y - 300);
+    octx.lineTo(p.x + 120, p.y - 300); octx.lineTo(p.x + 12, p.y - p.height / 2); octx.fill();
+
+    // Player 2 lights
+    if(state.isMultiplayer) {
+      p = state.player2;
+      grad = octx.createRadialGradient(p.x, p.y - p.height / 2, 20, p.x, p.y - 300, 200);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+      grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+      octx.fillStyle = grad;
+      octx.beginPath();
+      octx.moveTo(p.x - 12, p.y - p.height / 2); octx.lineTo(p.x - 120, p.y - 300);
+      octx.lineTo(p.x + 120, p.y - 300); octx.lineTo(p.x + 12, p.y - p.height / 2); octx.fill();
+    }
+
+    ctx.drawImage(overlay, 0, -yShift);
+  }
+
+  // Draw local HUD inside the viewport
+  const hudY = 70;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(20, hudY, 120, 8);
+  ctx.fillStyle = 'var(--neon-pink)';
+  ctx.fillRect(20, hudY, 120 * (focusPlayer.hp / focusPlayer.maxHp), 8);
+  ctx.font = 'bold 9px Orbitron'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+  ctx.fillText(isP2 ? 'P2 INTEGRITY' : 'P1 INTEGRITY', 20, hudY - 5);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(CONFIG.width - 140, hudY, 120, 8);
+  ctx.fillStyle = 'var(--neon-blue)';
+  ctx.fillRect(CONFIG.width - 140, hudY, 120 * (focusPlayer.nosEnergy / (focusPlayer.nosCapacity||100)), 8);
+  ctx.textAlign = 'right';
+  ctx.fillText(isP2 ? 'P2 NITROUS' : 'P1 NITROUS', CONFIG.width - 20, hudY - 5);
+
+  if (state.isMultiplayer) {
+     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = 'bold 16px Orbitron';
+     ctx.fillText((isP2 ? 'P2 SPEED: ' : 'P1 SPEED: ') + Math.floor(focusPlayer.speed*22) + ' KM/H', CONFIG.width/2, 30);
+  }
+
+  ctx.restore();
+}
+
+function drawPlayerObj(p, isP2) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.angle);
+
+  if (p.shieldActive) {
+    ctx.strokeStyle = 'var(--neon-pink)';
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = 'var(--neon-pink)';
+    ctx.beginPath();
+    ctx.arc(0, 0, p.height * 0.65, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  if (!isP2 && state.carPaintHue > 0) ctx.filter = \hue-rotate(\deg)\;
+  if (isP2) ctx.filter = 'hue-rotate(140deg)';
+
+  const selectedImgKey = isP2 ? 'player' : getPlayerImageKey();
+  const carImg = state.images[selectedImgKey] || state.images.player;
+  if (carImg) {
+    ctx.drawImage(carImg, -p.width / 2, -p.height / 2, p.width, p.height);
+  } else {
+    ctx.fillStyle = 'var(--neon-green)';
+    ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+  }
+  ctx.restore();
+}
+
+function drawGame() {
+  if (state.isMultiplayer) {
+    drawScene(0, 398, state.player, false);
+    ctx.fillStyle = 'var(--neon-pink)';
+    ctx.fillRect(0, 398, CONFIG.width, 4);
+    drawScene(402, 398, state.player2, true);
+  } else {
+    drawScene(0, 800, state.player, false);
+  }
+}

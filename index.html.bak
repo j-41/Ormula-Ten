@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Racing Game</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0f0f0f;
+  overflow: hidden;
+}
+
+/* ================= LOADING ================= */
+#loadingScreen {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 30% 30%, #0f1720, #02040a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  color: white;
+}
+
+.loadingBox {
+  text-align: center;
+}
+
+.progressTrack {
+  width: 300px;
+  height: 12px;
+  background: #222;
+  border-radius: 20px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.progressFill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg,#00c8ff,#00ffaa);
+}
+
+/* ================= GAME ================= */
+.game-area {
+  position: relative;
+  width: 420px;
+  height: 100vh;
+  margin: auto;
+  background: linear-gradient(#555, #2e2e2e);
+  overflow: hidden;
+  border-left: 10px solid #fff;
+  border-right: 10px solid #fff;
+  border-radius: 30px;
+}
+
+/* PLAYER */
+.car {
+  position: absolute;
+  width: 60px;
+  height: 110px;
+  background-image: url(src/racer_car.png);
+  background-size: cover;
+  top: 350px;
+  left: 180px;
+}
+
+/* ENEMIES */
+.enemy {
+  position: absolute;
+  width: 60px;
+  height: 110px;
+  background-size: cover;
+  top: -150px;
+}
+
+/* SAFETY CAR */
+#safetyCar {
+  position: absolute;
+  width: 65px;
+  height: 120px;
+  background-image: url(src/safety_car.png);
+  background-size: cover;
+  top: 200px;
+  left: 180px;
+  display: none;
+}
+
+/* HUD */
+.hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: white;
+  font-size: 14px;
+}
+
+/* UI OVERLAYS */
+.overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 5;
+}
+
+.hidden { display: none; }
+
+button {
+  padding: 10px 20px;
+  margin: 10px;
+  font-size: 16px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ================= LOADING SCREEN ================= -->
+<div id="loadingScreen">
+  <div class="loadingBox">
+    <h1>🏁 ORMULA 10</h1>
+    <p>LOADING...</p>
+
+    <div class="progressTrack">
+      <div class="progressFill" id="loadBar"></div>
+    </div>
+
+    <p id="loadText">0%</p>
+  </div>
+</div>
+
+<!-- ================= GAME ================= -->
+<div class="game-area">
+
+  <!-- HUD -->
+  <div class="hud">
+    Score: <span id="score">0</span><br>
+    High Score: <span id="highscore">0</span><br>
+    Speed: <span id="speed">2</span>
+  </div>
+
+  <!-- PLAYER -->
+  <div class="car" id="car"></div>
+
+  <!-- ENEMIES -->
+  <div class="enemy" id="enemy1"></div>
+  <div class="enemy" id="enemy2"></div>
+  <div class="enemy" id="enemy3"></div>
+
+  <!-- SAFETY CAR -->
+  <div id="safetyCar"></div>
+
+  <!-- MENU -->
+  <div class="overlay hidden" id="menu">
+    <h1>🏎️ Racing Game</h1>
+    <button onclick="startGame()">Start</button>
+  </div>
+
+  <!-- PAUSE -->
+  <div class="overlay hidden" id="pauseMenu">
+    <h1>Paused</h1>
+    <button onclick="resumeGame()">Resume</button>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay hidden" id="gameOver">
+    <h1>💥 Game Over</h1>
+    <p id="finalScore"></p>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+
+</div>
+
+<script>
+
+/* ================= LOADING ================= */
+let load = 0;
+let bar = document.getElementById("loadBar");
+let text = document.getElementById("loadText");
+
+let loader = setInterval(() => {
+  load += 2;
+  bar.style.width = load + "%";
+  text.innerText = load + "%";
+
+  if (load >= 100) {
+    clearInterval(loader);
+    document.getElementById("loadingScreen").style.display = "none";
+    document.getElementById("menu").classList.remove("hidden");
+  }
+}, 30);
+
+/* ================= SETUP ================= */
+const car = document.getElementById("car");
+const safetyCar = document.getElementById("safetyCar");
+
+const lanes = [90, 180, 270];
+
+let enemies = [
+  { el: document.getElementById("enemy1"), y: -100, lane: 0, active: true },
+  { el: document.getElementById("enemy2"), y: -400, lane: 2, active: true },
+  { el: document.getElementById("enemy3"), y: -800, lane: 1, active: false }
+];
+
+enemies[0].el.style.backgroundImage = "url(src/racer_enemy1.png)";
+enemies[1].el.style.backgroundImage = "url(src/racer_enemy2.png)";
+enemies[2].el.style.backgroundImage = "url(src/racer_enemy3.png)";
+
+let score = 0;
+let speed = 2;
+let highscore = localStorage.getItem("highscore") || 0;
+document.getElementById("highscore").innerText = highscore;
+
+let gameRunning = false;
+let paused = false;
+let edgeTime = 0;
+let yellowFlag = false;
+let safetyMode = false;
+
+/* ================= START ================= */
+function startGame() {
+  document.getElementById("menu").classList.add("hidden");
+  gameRunning = true;
+  gameLoop();
+}
+
+/* ================= PAUSE ================= */
+function pauseGame() {
+  paused = true;
+  document.getElementById("pauseMenu").classList.remove("hidden");
+}
+
+function resumeGame() {
+  paused = false;
+  document.getElementById("pauseMenu").classList.add("hidden");
+  gameLoop();
+}
+
+function restartGame() {
+  location.reload();
+}
+
+/* ================= CONTROLS ================= */
+document.addEventListener("keydown", (e) => {
+  let left = parseInt(getComputedStyle(car).left);
+
+  if (e.key === "ArrowLeft" && left > 0) car.style.left = left - 25 + "px";
+  if (e.key === "ArrowRight" && left < 350) car.style.left = left + 25 + "px";
+
+  if (e.key === "ArrowUp") speed = Math.min(speed + 1, 12);
+  if (e.key === "ArrowDown") speed = Math.max(speed - 1, 1);
+
+  if (e.key.toLowerCase() === "p") paused ? resumeGame() : pauseGame();
+});
+
+/* ================= EDGE FLAG ================= */
+function checkEdge() {
+  let left = parseInt(getComputedStyle(car).left);
+
+  if (left <= 0 || left >= 350) edgeTime++;
+  else edgeTime = 0;
+
+  if (edgeTime > 120 && !yellowFlag) {
+    yellowFlag = true;
+    safetyMode = true;
+
+    enemies.forEach(e => e.el.style.display = "none");
+    safetyCar.style.display = "block";
+
+    setTimeout(() => {
+      yellowFlag = false;
+      safetyMode = false;
+      edgeTime = 0;
+
+      enemies.forEach(e => e.el.style.display = "block");
+      safetyCar.style.display = "none";
+    }, 5000);
+  }
+}
+
+/* ================= COLLISION ================= */
+function hit(a, b) {
+  return (
+    a.left < b.right &&
+    a.right > b.left &&
+    a.top < b.bottom &&
+    a.bottom > b.top
+  );
+}
+
+/* ================= GAME LOOP ================= */
+function gameLoop() {
+  if (!gameRunning || paused) return;
+
+  checkEdge();
+
+  let c = car.getBoundingClientRect();
+
+  enemies.forEach((enemy, i) => {
+
+    if (enemy.el !== enemies[2].el || enemy.active) {
+
+      enemy.y += safetyMode ? 1 : speed;
+      enemy.el.style.top = enemy.y + "px";
+
+      if (enemy.y > window.innerHeight) {
+        enemy.y = -150;
+        enemy.lane = Math.floor(Math.random() * lanes.length);
+        enemy.el.style.left = lanes[enemy.lane] + "px";
+
+        score++;
+        document.getElementById("score").innerText = score;
+
+        if (score > highscore) {
+          highscore = score;
+          localStorage.setItem("highscore", highscore);
+          document.getElementById("highscore").innerText = highscore;
+        }
+      }
+
+      let e = enemy.el.getBoundingClientRect();
+
+      if (hit(c, e)) {
+        gameRunning = false;
+        document.getElementById("finalScore").innerText =
+          "Score: " + score + " | High: " + highscore;
+
+        document.getElementById("gameOver").classList.remove("hidden");
+      }
+    }
+  });
+
+  requestAnimationFrame(gameLoop);
+}
+
+</script>
+
+</body>
+</html>

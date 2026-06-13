@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ORMULA 10 - Ultimate Arcade Racing</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Outfit:wght@300;400;600&display=swap"
+    rel="stylesheet">
+
+  <!-- Game Styling -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="cyber-grid"></div>
+
+  <!-- ================= GAME CONTAINER ================= -->
+  <div id="gameContainer">
+
+    <!-- HUD -->
+    <div id="hudPanel" class="hidden">
+      <div class="hud-item">
+        <div class="hud-label">Score</div>
+        <div class="hud-val green" id="hudScore">00000</div>
+      </div>
+      <div class="hud-item" style="text-align: center;">
+        <div class="hud-label">Speed</div>
+        <div class="hud-val blue" id="hudSpeed">0 KM/H</div>
+      </div>
+      <div class="hud-item" style="text-align: center;">
+        <div class="hud-label">Coins</div>
+        <div class="hud-val yellow" id="hudCoins">🪙 0</div>
+      </div>
+      <div class="hud-item" style="text-align: center;">
+        <div class="hud-label">Gems</div>
+        <div class="hud-val pink" id="hudGems">💎 0</div>
+      </div>
+      <div class="hud-item" style="text-align: right;">
+        <div class="hud-label">High Score</div>
+        <div class="hud-val yellow" id="hudHighscore">00000</div>
+      </div>
+    </div>
+
+    <!-- Warning Banner -->
+    <div id="warningBanner" class="warning-flash">⚠️ OFF ROAD! SLOW DOWN!</div>
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" width="480" height="800"></canvas>
+
+    <!-- Mobile On-screen Controls -->
+    <div id="mobileControls" class="mobile-controls">
+      <div style="display:flex; gap: 15px; pointer-events: auto;">
+        <div class="touch-btn" id="btnLeft">◀</div>
+        <div class="touch-btn" id="btnRight">▶</div>
+      </div>
+      <div style="display:flex; gap: 15px; pointer-events: auto;">
+        <div class="touch-btn boost" id="btnBoost">⚡</div>
+      </div>
+    </div>
+
+    <!-- ================= LOADING SCREEN ================= -->
+    <div id="loadingScreen" class="overlay-screen" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#06070d;">
+      <img id="loadingEditionLogo" src="src/logos/standard_edition_logo.png" style="width:165px; margin-bottom: 6px;"
+        alt="Edition Logo" onerror="this.style.display='none'">
+      <h1 class="glitch-title">ORMULA 10</h1>
+      <span id="loadingEditionBadge" class="edition-badge standard">STANDARD EDITION</span>
+      <script>
+        (function () {
+          var savedEdition = localStorage.getItem('ormula_edition') || 'standard';
+          var adminAccessed = localStorage.getItem('ormula_admin_accessed') === 'true';
+          if (adminAccessed && savedEdition === 'standard') {
+            savedEdition = 'editor';
+          }
+          var logos = {
+            standard: 'src/logos/standard_edition_logo.png',
+            beta: 'src/logos/beta_edition_logo.png',
+            ultimate: 'src/logos/ultimate_edition_logo.png',
+            vip: 'src/logos/vip_edition_logo.png',
+            editor: 'src/logos/editor_edition_logo.png'
+          };
+          var names = {
+            standard: 'STANDARD EDITION',
+            beta: 'BETA EDITION',
+            ultimate: 'ULTIMATE EDITION',
+            vip: 'VIP EDITION',
+            editor: 'EDITOR EDITION'
+          };
+          var badges = {
+            standard: 'standard',
+            beta: 'beta',
+            ultimate: 'ultimate',
+            vip: 'vip',
+            editor: 'editor'
+          };
+          var loadLogo = document.getElementById('loadingEditionLogo');
+          var loadBadge = document.getElementById('loadingEditionBadge');
+          if (loadLogo && logos[savedEdition]) {
+            loadLogo.src = logos[savedEdition];
+          }
+          if (loadBadge && names[savedEdition]) {
+            loadBadge.innerText = names[savedEdition];
+            loadBadge.className = 'edition-badge ' + (badges[savedEdition] || 'standard');
+          }
+        })();
+      </script>
+
+      <div class="glass-card" style="margin-top: 20px; width:280px;">
+        <p style="margin: 0; font-size: 0.85rem; letter-spacing: 2px;">CALIBRATING CIRCUITS...</p>
+        <div class="progress-track">
+          <div class="progress-fill" id="loadBar"></div>
+        </div>
+        <p id="loadText"
+          style="margin: 0; font-family: 'Orbitron', sans-serif; font-size: 1.1rem; color: var(--neon-green);">0%</p>
+      </div>
+    </div>
+
+    <!-- ================= MAIN MENU ================= -->
+    <div class="overlay-screen hidden" id="mainMenu">
+      <img id="editionLogoImg" src="src/logos/standard_edition_logo.png" style="width:165px; margin-bottom: 6px;"
+        alt="Edition Logo" onerror="this.style.display='none'">
+      <h1 class="glitch-title" style="font-size: 2.2rem;">ORMULA 10</h1>
+      <span id="editionBadge" class="edition-badge standard">STANDARD EDITION</span>
+
+      <div class="glass-card">
+        <button class="menu-btn primary" onclick="startNewRace()">🏎️ RACE NOW — SOLO</button>
+        <button class="menu-btn" onclick="openGarage()">GARAGE &amp; PAINT</button>
+        <button class="menu-btn" onclick="openCarShop()">CAR SHOP</button>
+        <button class="menu-btn" onclick="openThemes()">SELECT THEME</button>
+        <button class="menu-btn" onclick="openEditions()">EDITIONS</button>
+        <button class="menu-btn" onclick="openHelp()">HOW TO PLAY</button>
+
+        <div class="audio-controls">
+          <button class="icon-btn active" id="btnToggleMusic" onclick="toggleMusic()" title="Toggle Music">🎵</button>
+          <button class="icon-btn active" id="btnToggleSFX" onclick="toggleSFX()" title="Toggle SFX">🔊</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= GARAGE MENU ================= -->
+    <div class="overlay-screen hidden" id="garageMenu">
+      <h1 class="glitch-title" style="font-size: 1.8rem; margin-bottom: 5px;">GARAGE</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 15px;">UPGRADE YOUR PERFORMANCE</div>
+
+      <div class="glass-card" style="padding: 16px;">
+        <div class="wallet-display">
+          <span>CREDITS:</span>
+          <span id="garageWallet">🪙 0</span>
+        </div>
+
+        <!-- Upgrade Grid -->
+        <div class="garage-grid">
+          <!-- Speed -->
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <div class="upgrade-name">TOP ENGINE <span class="upgrade-lvl" id="lvlSpeed">LVL 1</span></div>
+              <div class="upgrade-bar" id="barSpeed"></div>
+            </div>
+            <button class="upgrade-btn" id="btnUpgradeSpeed" onclick="buyUpgrade('speed')">🪙 50</button>
+          </div>
+          <!-- Handling -->
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <div class="upgrade-name">STEERING RADIALS <span class="upgrade-lvl" id="lvlHandling">LVL 1</span></div>
+              <div class="upgrade-bar" id="barHandling"></div>
+            </div>
+            <button class="upgrade-btn" id="btnUpgradeHandling" onclick="buyUpgrade('handling')">🪙 50</button>
+          </div>
+          <!-- Armor -->
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <div class="upgrade-name">TITANIUM CHASSIS <span class="upgrade-lvl" id="lvlArmor">LVL 1</span></div>
+              <div class="upgrade-bar" id="barArmor"></div>
+            </div>
+            <button class="upgrade-btn" id="btnUpgradeArmor" onclick="buyUpgrade('armor')">🪙 75</button>
+          </div>
+          <!-- NOS Boost -->
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <div class="upgrade-name">NITROUS PACK <span class="upgrade-lvl" id="lvlNOS">LVL 1</span></div>
+              <div class="upgrade-bar" id="barNOS"></div>
+            </div>
+            <button class="upgrade-btn" id="btnUpgradeNOS" onclick="buyUpgrade('nos')">🪙 60</button>
+          </div>
+          <!-- Magnet -->
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <div class="upgrade-name">COIN MAGNET <span class="upgrade-lvl" id="lvlMAGNET">LVL 1</span></div>
+              <div class="upgrade-bar" id="barMAGNET"></div>
+            </div>
+            <button class="upgrade-btn" id="btnUpgradeMAGNET" onclick="buyUpgrade('magnet')">🪙 80</button>
+          </div>
+          <!-- Shield -->
+          <div class="upgrade-item">
+            <div class="upgrade-info">
+              <div class="upgrade-name">SHIELD MATRIX <span class="upgrade-lvl" id="lvlSHIELD">LVL 1</span></div>
+              <div class="upgrade-bar" id="barSHIELD"></div>
+            </div>
+            <button class="upgrade-btn" id="btnUpgradeSHIELD" onclick="buyUpgrade('shield')">🪙 90</button>
+          </div>
+        </div>
+
+        <!-- Paint Picker -->
+        <div class="paint-section">
+          <div class="paint-label">
+            <span>BODY PAINT WORK</span>
+            <span id="paintHueVal">0°</span>
+          </div>
+          <input type="range" min="0" max="360" value="0" class="paint-slider" id="paintSlider"
+            oninput="updateCarPaint(this.value)">
+        </div>
+
+        <button class="menu-btn" onclick="backToMenu()" style="margin: 0; padding: 10px;">BACK TO MENU</button>
+      </div>
+    </div>
+
+    <!-- ================= HOW TO PLAY MENU ================= -->
+    <div class="overlay-screen hidden" id="helpMenu">
+      <h1 class="glitch-title" style="font-size: 1.8rem;">HOW TO PLAY</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 12px;">PILOT MANUAL — ORMULA 10</div>
+
+      <div class="glass-card" style="max-width:460px; text-align:left; max-height:80vh; overflow-y:auto;">
+        <div class="help-content">
+
+          <div style="font-size:0.72rem;font-weight:bold;color:var(--neon-green);letter-spacing:2px;margin-bottom:6px;">🎮 SOLO MODE</div>
+          <div class="help-row"><div class="help-key">W / ▲</div><div>Accelerate</div></div>
+          <div class="help-row"><div class="help-key">S / ▼</div><div>Brake</div></div>
+          <div class="help-row"><div class="help-key">A / ◀</div><div>Steer Left</div></div>
+          <div class="help-row"><div class="help-key">D / ▶</div><div>Steer Right</div></div>
+          <div class="help-row"><div class="help-key">SPACE</div><div>Nitrous Boost</div></div>
+          <div class="help-row"><div class="help-key">P</div><div>Pause</div></div>
+
+          <div style="font-size:0.72rem;font-weight:bold;color:var(--neon-yellow);letter-spacing:2px;margin:10px 0 5px;">💡 PRO TIPS</div>
+          <div style="font-size:0.76rem;line-height:1.7;">
+            • Near misses with traffic give speed boosts &amp; NOS.<br>
+            • 🪙 Coins → Cars → Per-car upgrades (up to Level 50).<br>
+            • Wrench pickups repair your chassis mid-race.<br>
+            • Off-road triggers Yellow Flag &amp; Safety Car.<br>
+            • Each car has its own independent upgrade stats.<br>
+            • Open Admin Console: <strong>Ctrl+Shift+A</strong> → Editor Edition.
+          </div>
+        </div>
+        <button class="menu-btn" onclick="backToMenu()" style="margin-top:12px;">I AM READY</button>
+      </div>
+    </div>
+
+    <!-- ================= PAUSE MENU ================= -->
+    <div class="overlay-screen hidden" id="pauseMenu">
+      <h1 class="glitch-title" style="font-size: 2.2rem; color: var(--neon-blue);">PAUSED</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 25px;">SYSTEM SUSPENDED</div>
+
+      <div class="glass-card">
+        <button class="menu-btn primary" onclick="resumeGame()">RESUME MISSION</button>
+        <button class="menu-btn" onclick="restartGame()">RESTART RUN</button>
+        <button class="menu-btn" onclick="quitToMenu()">ABORT TO MENU</button>
+      </div>
+    </div>
+
+    <!-- ================= GAME OVER OVERLAY ================= -->
+    <div class="overlay-screen hidden" id="gameOverScreen">
+      <h1 class="glitch-title" style="font-size: 2.2rem; color: var(--neon-pink);">CRITICAL IMPACT</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 20px;">CHASSIS DESTROYED</div>
+
+      <div class="glass-card">
+        <div style="font-size: 0.85rem; letter-spacing: 2px; color: #888;">FINAL RUN RECORD</div>
+        <div id="gameOverStats"
+          style="font-family: 'Orbitron', sans-serif; font-size: 1.1rem; margin: 15px 0; line-height: 1.8;">
+          SCORE: <span class="green" id="finalScore">00000</span><br>
+          COINS SECURED: <span class="yellow" id="finalCoins">🪙 0</span><br>
+          GEMS SECURED: <span class="pink" id="finalGems">💎 0</span><br>
+          HIGH SCORE: <span class="blue" id="finalHigh">00000</span>
+        </div>
+
+        <button class="menu-btn primary" onclick="restartGame()">RESTART RACE</button>
+        <button class="menu-btn" onclick="quitToMenu()">MAIN MENU</button>
+      </div>
+    </div>
+
+    <!-- ================= THEMES MENU ================= -->
+    <div class="overlay-screen hidden" id="themesMenu">
+      <h1 class="glitch-title" style="font-size: 1.8rem; margin-bottom: 5px;">THEMES</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 15px;">SELECT IN-GAME ENVIRONMENT</div>
+
+      <div class="glass-card" style="padding: 16px; width: 100%; max-width: 380px;">
+        <div class="wallet-display">
+          <span>CREDITS:</span>
+          <span id="themesWallet">🪙 0</span>
+        </div>
+
+        <div class="themes-grid" id="themesGridContainer">
+          <!-- Dynamically populated via JS -->
+        </div>
+
+        <button class="menu-btn" onclick="backToMenu()" style="margin: 15px 0 0 0; padding: 10px;">BACK TO MENU</button>
+      </div>
+    </div>
+
+
+    <!-- ================= EDITION OVERLAY ================= -->
+    <div class="overlay-screen hidden" id="editionMenu">
+      <h1 class="glitch-title" style="font-size: 1.8rem; margin-bottom: 5px;">EDITIONS</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 15px;">SWITCH YOUR RACING PACKAGE</div>
+      <div class="glass-card" style="padding: 16px; width: 100%; max-width: 420px;">
+        <div class="themes-grid" id="editionGrid" style="grid-template-columns: 1fr 1fr; max-height: 340px;">
+          <!-- Dynamically populated via JS -->
+        </div>
+        <button class="menu-btn" onclick="backToMenu()" style="margin: 12px 0 0 0; padding: 10px;">BACK TO MENU</button>
+      </div>
+    </div>
+
+    <!-- ================= CAR SHOP OVERLAY ================= -->
+    <div class="overlay-screen hidden" id="carShopMenu">
+      <h1 class="glitch-title" style="font-size: 1.8rem; margin-bottom: 5px;">CAR SHOP</h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 15px;">CHOOSE YOUR MACHINE</div>
+
+      <div class="glass-card" style="padding: 16px; width: 100%; max-width: 420px;">
+        <div class="wallet-display">
+          <span>CREDITS:</span>
+          <span id="carShopWallet">&#129689; 0</span>
+        </div>
+        <div class="themes-grid" id="carShopGrid" style="grid-template-columns: repeat(2,1fr); max-height: 340px;">
+          <!-- Dynamically populated via JS -->
+        </div>
+        <button class="menu-btn" onclick="backToMenu()" style="margin: 12px 0 0 0; padding: 10px;">BACK TO MENU</button>
+      </div>
+    </div>
+    <!-- ================= ADMIN PANEL OVERLAY ================= -->
+    <div class="overlay-screen hidden" id="adminPanel">
+      <h1 class="glitch-title"
+        style="font-size: 1.8rem; color: #ff0055; filter: drop-shadow(0 0 10px rgba(255, 0, 85, 0.5));">SYSTEM CONTROL
+      </h1>
+      <div class="subtitle" style="font-size: 0.75rem; margin-bottom: 15px; color: #ff0055;">ADMIN CONSOLE LEVEL 99
+      </div>
+
+      <div class="glass-card" style="padding: 15px; width: 100%; max-height: 80vh; overflow-y: auto;">
+        <div class="admin-grid">
+          <!-- Resources -->
+          <div class="admin-section">
+            <h3>RESOURCES</h3>
+            <div class="admin-btn-row">
+              <button class="admin-btn sm" onclick="adminAddCoins(1000)">+1K</button>
+              <button class="admin-btn sm" onclick="adminAddCoins(10000)">+10K</button>
+              <button class="admin-btn sm" onclick="adminAddCoins(100000)">+100K</button>
+              <button class="admin-btn sm" onclick="adminAddCoins(1000000)">+1M</button>
+            </div>
+            <div class="admin-coin-row" style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+              <input type="number" id="adminCoinInput" class="admin-input" placeholder="Custom amount" min="0"
+                style="flex:1;">
+              <button class="admin-btn sm" onclick="adminAddCustomCoins()" style="min-width:64px;">ADD</button>
+            </div>
+            <button class="admin-btn sm" onclick="adminAddScore(1000)">+1K SCORE</button>
+            <button class="admin-btn sm" onclick="adminAddScore(10000)">+10K SCORE</button>
+            <button class="admin-btn sm" onclick="adminAddScore(100000)">+100K SCORE</button>
+            <button class="admin-btn sm" onclick="adminAddScore(1000000)">+1M SCORE</button>
+            <div class="admin-coin-row" style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+              <input type="number" id="adminScoreInput" class="admin-input" placeholder="Custom score" min="0"
+                style="flex:1;">
+              <button class="admin-btn sm" onclick="adminAddCustomScore()" style="min-width:64px;">ADD</button>
+            </div>
+            <div class="admin-coin-row" style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+              <input type="number" id="adminGemInput" class="admin-input" placeholder="Gems amount" min="0"
+                style="flex:1;">
+              <button class="admin-btn sm" onclick="adminAddCustomGems()" style="min-width:64px;">💎 ADD</button>
+            </div>
+          </div>
+          <!-- Upgrade Level Controls -->
+          <div class="admin-section">
+            <h3>UPGRADE LEVELS <span style="font-size:0.65rem;color:#888;">(MAX 50)</span></h3>
+            <div id="adminUpgradeControls">
+              <!-- Dynamically generated -->
+            </div>
+          </div>
+
+          <!-- Cheats -->
+          <div class="admin-section">
+            <h3>CHEATS</h3>
+            <label class="admin-toggle">
+              <input type="checkbox" id="chkGodMode" onchange="toggleGodMode(this.checked)">
+              <span>GOD MODE (INVINCIBLE)</span>
+            </label>
+            <label class="admin-toggle" style="margin-top: 10px;">
+              <input type="checkbox" id="chkInfNos" onchange="toggleInfNos(this.checked)">
+              <span>INFINITE NITROUS</span>
+            </label>
+          </div>
+
+          <!-- Spawners -->
+          <div class="admin-section">
+            <h3>SPAWN ENTITIES</h3>
+            <div class="admin-btn-row">
+              <button class="admin-btn sm" onclick="adminSpawn('coin')">COIN</button>
+              <button class="admin-btn sm" onclick="adminSpawn('nos')">NOS</button>
+              <button class="admin-btn sm" onclick="adminSpawn('shield')">SHIELD</button>
+              <button class="admin-btn sm" onclick="adminSpawn('repair')">REPAIR</button>
+            </div>
+            <button class="admin-btn" style="margin-top: 8px;" onclick="deploySafetyCar()">DEPLOY SAFETY CAR</button>
+          </div>
+
+          <!-- Physics Speed -->
+          <div class="admin-section">
+            <h3>PHYSICS SPEED</h3>
+            <div class="admin-btn-row">
+              <button class="admin-btn sm" onclick="adminSetSpeed(0.5)">0.5X</button>
+              <button class="admin-btn sm" onclick="adminSetSpeed(1.0)">1.0X</button>
+              <button class="admin-btn sm" onclick="adminSetSpeed(2.0)">2.0X</button>
+              <button class="admin-btn sm" onclick="adminSetSpeed(4.0)">4.0X</button>
+            </div>
+          </div>
+
+          <!-- System Actions -->
+          <div class="admin-section">
+            <h3>SYSTEM ACTIONS</h3>
+            <button class="admin-btn" onclick="adminUnlockAll()">UNLOCK ALL THEMES</button>
+            <button class="admin-btn danger" onclick="adminResetAll()">WIPE ALL PERSISTENT DATA</button>
+          </div>
+        </div>
+
+        <button class="menu-btn" onclick="closeAdminPanel()" style="margin-top: 15px; padding: 8px;">CLOSE
+          CONSOLE</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Game Engine Logic -->
+  <script src="game.js"></script>
+  <script src="game_additions.js"></script>
+
+</body>
+
+</html>

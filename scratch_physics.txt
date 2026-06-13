@@ -1,0 +1,186 @@
+function updatePhysics() {
+  if (state.screenShake > 0) state.screenShake *= 0.9;
+
+  updatePlayerPhysics(state.player, false);
+  if (state.isMultiplayer) {
+    updatePlayerPhysics(state.player2, true);
+    state.speed = (state.player.speed + state.player2.speed) / 2;
+  } else {
+    state.speed = state.player.speed;
+  }
+
+  // Steer engine pitch
+  if (engineSound) {
+    engineSound.update(state.speed / state.maxSpeed, keysHeld['arrowup'] || keysHeld['w'] || state.player.nosActive);
+  }
+
+  state.roadY = (state.roadY + state.speed) % CONFIG.height;
+
+  // Increment dynamic score by driving distance
+  if (state.speed > 2) {
+    state.score += Math.floor((state.speed / 4) * state.gameSpeedMultiplier);
+  }
+
+  // --- SYSTEM ENVIRONMENT CYCLES & THEME SPAWNERS ---
+  // Spawn Theme Specific Particles
+  if (state.currentTheme === 'new_years' && Math.random() < 0.03 * state.gameSpeedMultiplier) {
+    // Fireworks
+    const fx = Math.random() * CONFIG.width;
+    const fy = 50 + Math.random() * 200;
+    const colors = ['#ffd700', '#ff0055', '#00ffaa', '#00c8ff', '#ff00ff'];
+    const col = colors[Math.floor(Math.random() * colors.length)];
+    for (let i = 0; i < 15; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 3;
+      spawnParticle(fx, fy, Math.cos(angle) * speed, Math.sin(angle) * speed, col, 2 + Math.random() * 2, 30 + Math.random() * 20, 'firework');
+    }
+  }
+  if ((state.currentTheme === 'christmas' || state.currentTheme === 'winter') && Math.random() < 0.3 * state.gameSpeedMultiplier) {
+    // Snow
+    spawnParticle(Math.random() * CONFIG.width, -10, (Math.random() - 0.5) * 0.5, 1.5 + Math.random() * 1.5, '#ffffff', 2 + Math.random() * 2, 400, 'snow');
+  }
+  if ((state.currentTheme === 'autumn' || state.currentTheme === 'fall') && Math.random() < 0.25 * state.gameSpeedMultiplier) {
+    // Leaves
+    const colors = ['#e67e22', '#d35400', '#f39c12', '#c0392b'];
+    const col = colors[Math.floor(Math.random() * colors.length)];
+    spawnParticle(Math.random() * CONFIG.width, -10, -0.5 - Math.random() * 1.0, 1.0 + Math.random() * 1.5, col, 3 + Math.random() * 3, 400, 'leaf');
+  }
+  if (state.currentTheme === 'easter' && Math.random() < 0.15 * state.gameSpeedMultiplier) {
+    // Flowers
+    const colors = ['#ffb8b8', '#ffda79', '#81ecec', '#fab1a0'];
+    const col = colors[Math.floor(Math.random() * colors.length)];
+    spawnParticle(Math.random() * CONFIG.width, -10, (Math.random() - 0.5) * 0.5, 1.0 + Math.random() * 1.0, col, 3 + Math.random() * 2, 400, 'flower');
+  }
+  if (state.currentTheme === 'vip' && state.speed > 1 && Math.random() < 0.4 * state.gameSpeedMultiplier) {
+    // Golden trail
+    spawnParticle(state.player.x + (Math.random() * 20 - 10), state.player.y + state.player.height / 2, (Math.random() - 0.5) * 2, 2 + Math.random() * 2, '#ffd700', 2 + Math.random() * 2, 15, 'gold');
+  }
+
+  // Weather cycling
+  state.weatherTimer -= state.gameSpeedMultiplier;
+  if (state.weatherTimer <= 0) {
+    state.weatherTimer = 1500 + Math.random() * 2000;
+    state.weather = state.weather === 'sunny' ? 'rain' : 'sunny';
+    state.rainParticles = [];
+    if (state.weather === 'rain') {
+      for (let i = 0; i < 40; i++) {
+        state.rainParticles.push({
+          x: Math.random() * CONFIG.width,
+          y: Math.random() * CONFIG.height,
+          speed: 12 + Math.random() * 6,
+          len: 15 + Math.random() * 10
+        });
+      }
+    }
+  }
+
+  // Day Night cycle
+  state.timeOfDayTimer--;
+  if (state.timeOfDayTimer <= 0) {
+    state.timeOfDayTimer = 1200;
+    const cycle = ['day', 'sunset', 'night', 'dawn'];
+    const idx = (cycle.indexOf(state.timeOfDay) + 1) % cycle.length;
+    state.timeOfDay = cycle[idx];
+  }
+}
+
+function updatePlayerPhysics(p, isP2) {
+  let targetVx = 0;
+  let left, right, up, down, nos;
+  if (state.isMultiplayer) {
+    if (isP2) {
+      left = keysHeld['arrowleft']; right = keysHeld['arrowright'];
+      up = keysHeld['arrowup']; down = keysHeld['arrowdown']; nos = keysHeld[' '];
+    } else {
+      left = keysHeld['a']; right = keysHeld['d'];
+      up = keysHeld['w']; down = keysHeld['s']; nos = keysHeld['shift'];
+    }
+  } else {
+    left = keysHeld['arrowleft'] || keysHeld['a']; right = keysHeld['arrowright'] || keysHeld['d'];
+    up = keysHeld['arrowup'] || keysHeld['w']; down = keysHeld['arrowdown'] || keysHeld['s']; nos = keysHeld[' '];
+  }
+
+  if (left) targetVx = -p.steerPower;
+  if (right) targetVx = p.steerPower;
+
+  const isWinter = state.currentTheme === 'winter';
+  const weatherSlippiness = state.weather === 'rain' ? 0.7 : (isWinter ? 0.4 : 1.0);
+  p.vx += (targetVx - p.vx) * 0.15 * weatherSlippiness * state.gameSpeedMultiplier;
+  p.x += p.vx;
+  p.angle = p.vx * 0.035;
+
+  const minX = 85 + p.width / 2;
+  const maxX = 395 - p.width / 2;
+
+  if (p.x < minX) {
+    p.x = minX;
+    p.vx = 0.5;
+    state.screenShake = 3;
+    spawnParticle(p.x - p.width / 2, p.y + p.height / 4, -3, -1, 'var(--neon-pink)', 3, 10);
+    p.offRoadTime++;
+  } else if (p.x > maxX) {
+    p.x = maxX;
+    p.vx = -0.5;
+    state.screenShake = 3;
+    spawnParticle(p.x + p.width / 2, p.y + p.height / 4, 3, -1, 'var(--neon-pink)', 3, 10);
+    p.offRoadTime++;
+  } else {
+    p.offRoadTime = 0;
+  }
+
+  if (p.offRoadTime > 30) {
+    if (!isP2) {
+      const warningBanner = document.getElementById('warningBanner');
+      if (warningBanner) {
+        warningBanner.innerText = '?? OFF ROAD! SLOW DOWN!';
+        warningBanner.className = 'warning-flash';
+        warningBanner.style.display = 'block';
+      }
+    }
+    p.targetSpeed = Math.min(p.targetSpeed, 3);
+    if (p.offRoadTime > 120 && !state.yellowFlag) {
+      deploySafetyCar();
+    }
+  } else if (!isP2 && !state.safetyCarActive) {
+    const warningBanner = document.getElementById('warningBanner');
+    if (warningBanner) warningBanner.style.display = 'none';
+  }
+
+  let isAccelerating = false;
+  if (up) {
+    p.targetSpeed = p.maxSpeed || state.maxSpeed;
+    isAccelerating = true;
+  } else if (down) {
+    p.targetSpeed = 1.5;
+  } else if (!state.yellowFlag) {
+    p.targetSpeed = (p.maxSpeed || state.maxSpeed) * 0.6;
+  }
+
+  if (nos && (p.nosEnergy > 0 || state.infNos) && !state.yellowFlag) {
+    p.nosActive = true;
+    p.targetSpeed = (p.maxSpeed || state.maxSpeed) * 1.5;
+    if (!state.infNos) {
+      p.nosEnergy -= 0.8 * state.gameSpeedMultiplier;
+    }
+    state.screenShake = Math.max(state.screenShake, 1.5);
+    spawnParticle(p.x - 12, p.y + p.height / 2, Math.random() * 2 - 1, 4 + Math.random() * 2, 'var(--neon-blue)', 4, 15, 'smoke');
+    spawnParticle(p.x + 12, p.y + p.height / 2, Math.random() * 2 - 1, 4 + Math.random() * 2, 'var(--neon-blue)', 4, 15, 'smoke');
+    if (Math.random() < 0.05 && !isP2) playSFX('nos');
+  } else {
+    p.nosActive = false;
+    const rechargeAmt = state.unlockedThemes.includes('vip') ? 0.16 : 0.08;
+    if (p.nosEnergy < p.nosCapacity) p.nosEnergy += rechargeAmt * state.gameSpeedMultiplier;
+  }
+
+  p.speed += (p.targetSpeed - p.speed) * (p.acceleration || state.acceleration) * state.gameSpeedMultiplier;
+  p.distance += p.speed * state.gameSpeedMultiplier;
+
+  if (p.speed > 1 && Math.random() < 0.3 * state.gameSpeedMultiplier) {
+    spawnParticle(p.x, p.y + p.height / 2, Math.random() * 2 - 1, 2, 'var(--neon-yellow)', 2, 8);
+  }
+
+  if (p.shieldActive) {
+    p.shieldTime -= state.gameSpeedMultiplier;
+    if (p.shieldTime <= 0) p.shieldActive = false;
+  }
+}
